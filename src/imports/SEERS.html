@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEERS — Smart Earthquake Emergency Response System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- jsQR — real QR code decoder for camera scanning -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;600;700;900&display=swap');
+:root{
+  --navy:#f0f4f8;--teal:#2563eb;--teal2:#1d4ed8;    
+  --orange:#ea6c00;--red:#dc2626;--green:#16a34a;--yellow:#b45309;
+  --white:#1e293b;--gray:#64748b;
+  --mono:'Share Tech Mono',monospace;--head:'Exo 2',sans-serif;--body:'Rajdhani',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--navy);color:var(--white);font-family:var(--body);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(37,99,235,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(37,99,235,0.05) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;z-index:0;}
+@keyframes shake{0%,100%{transform:translate(0,0)}10%{transform:translate(-6px,4px)}20%{transform:translate(7px,-5px)}30%{transform:translate(-8px,6px)}40%{transform:translate(9px,-4px)}50%{transform:translate(-5px,7px)}60%{transform:translate(8px,-6px)}70%{transform:translate(-7px,5px)}80%{transform:translate(6px,-3px)}90%{transform:translate(-4px,4px)}}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.7)}50%{box-shadow:0 0 0 20px rgba(220,38,38,0)}}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}50%{box-shadow:0 0 0 12px rgba(22,163,74,0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes scan{0%{top:0}100%{top:100%}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ripple{0%{transform:scale(1);opacity:.8}100%{transform:scale(3);opacity:0}}
+body.shaking{animation:shake .8s ease-in-out 3;}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.97);border-bottom:2px solid #dbeafe;backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+.logo{font-family:var(--head);font-weight:900;font-size:20px;letter-spacing:3px;color:var(--teal);}
+.logo span{color:var(--orange);}
+.topbar-center{font-family:var(--mono);font-size:12px;color:var(--gray);display:flex;gap:24px;}
+.status-indicator{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--green);animation:pulse-green 2s infinite;}
+.dot.red{background:var(--red);animation:pulse-red .8s infinite;}
+#clock{font-family:var(--mono);font-size:13px;color:var(--teal);}
+.alert-banner{display:none;background:var(--red);color:#fff;text-align:center;padding:12px;font-family:var(--head);font-weight:700;font-size:16px;letter-spacing:3px;animation:blink .6s infinite;position:relative;z-index:99;}
+.alert-banner.show{display:block;}
+.main{position:relative;z-index:1;padding:20px;max-width:1500px;margin:0 auto;}
+.seismic-bar{background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;padding:14px 20px;display:flex;align-items:center;gap:20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.07);}
+.seismic-label{font-family:var(--mono);font-size:11px;color:var(--gray);min-width:140px;}
+.seismic-canvas-wrap{flex:1;height:56px;overflow:hidden;border-radius:4px;background:#f1f5f9;position:relative;}
+canvas#seismic{height:56px;}
+.magnitude-display{font-family:var(--mono);font-size:26px;min-width:80px;text-align:right;}
+.magnitude-display.safe-mag{color:var(--green);}
+.magnitude-display.alert{color:var(--red);animation:blink .5s infinite;}
+.mmi-label{font-family:var(--body);font-size:11px;color:var(--gray);}
+.seismic-readings{display:flex;flex-direction:column;gap:4px;min-width:140px;}
+.axis-reading{font-family:var(--mono);font-size:11px;display:flex;justify-content:space-between;gap:8px;}
+.axis-reading span:first-child{color:var(--gray);}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+.stat-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:18px;position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--accent,var(--teal));border-radius:2px 2px 0 0;}
+.stat-card .label{font-family:var(--mono);font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:2px;}
+.stat-card .value{font-family:var(--head);font-size:40px;font-weight:900;line-height:1;margin:8px 0 4px;}
+.stat-card .sub{font-size:11px;color:var(--gray);font-family:var(--mono);}
+.stat-card.safe{--accent:var(--green);}.stat-card.safe .value{color:var(--green);}
+.stat-card.missing{--accent:var(--red);}.stat-card.missing .value{color:var(--red);}
+.stat-card.evacuated{--accent:var(--teal);}.stat-card.evacuated .value{color:var(--teal);}
+.stat-card.total{--accent:var(--orange);}.stat-card.total .value{color:var(--orange);}
+.grid-main{display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:20px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.panel{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.panel-header{padding:12px 18px;border-bottom:1px solid #e8edf4;display:flex;align-items:center;justify-content:space-between;background:#f8fafc;}
+.panel-title{font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:2px;color:var(--teal);text-transform:uppercase;}
+.panel-body{padding:16px;}
+.student-table{width:100%;border-collapse:collapse;font-size:12px;}
+.student-table th{font-family:var(--mono);font-size:10px;color:var(--gray);text-align:left;padding:8px 10px;border-bottom:1.5px solid #e2e8f0;text-transform:uppercase;letter-spacing:1px;}
+.student-table td{padding:9px 10px;border-bottom:1px solid #f1f5f9;font-family:var(--body);font-size:13px;}
+.student-table tr{transition:background .3s;animation:fadeIn .4s ease;}
+.student-table tr:hover{background:#f0f6ff;}
+.badge{display:inline-block;padding:2px 10px;border-radius:4px;font-size:10px;font-family:var(--mono);font-weight:700;letter-spacing:1px;}
+.badge.safe{background:#dcfce7;color:#15803d;border:1px solid #86efac;}
+.badge.missing{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;animation:blink 1s infinite;}
+.badge.pending{background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;}
+.badge.evacuated{background:#ffedd5;color:#ea6c00;border:1px solid #fdba74;}
+.log-feed{height:260px;overflow-y:auto;font-family:var(--mono);font-size:11px;line-height:1.8;}
+.log-feed::-webkit-scrollbar{width:4px;}
+.log-feed::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
+.log-entry{padding:4px 0;border-bottom:1px solid #f1f5f9;animation:fadeIn .3s ease;}
+.log-entry .ts{color:var(--gray);margin-right:10px;}
+.log-entry.ok .msg{color:var(--green);}
+.log-entry.warn .msg{color:var(--yellow);}
+.log-entry.err .msg{color:var(--red);}
+.log-entry.info .msg{color:var(--teal);}
+.progress-item{margin-bottom:14px;}
+.progress-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;font-family:var(--mono);}
+.progress-track{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:4px;transition:width 1s ease;}
+.controls{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+.btn{padding:10px 20px;border:none;border-radius:6px;font-family:var(--head);font-weight:700;font-size:12px;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;transition:all .2s;position:relative;overflow:hidden;}
+.btn:hover{filter:brightness(1.08);}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-warning{background:var(--orange);color:#fff;}
+.btn-success{background:var(--green);color:#fff;}
+.btn-outline{background:#fff;color:var(--teal);border:2px solid var(--teal);}
+.btn-sm{padding:6px 14px;font-size:11px;}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.scanner-box{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:16px;text-align:center;position:relative;overflow:hidden;}
+.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--teal),transparent);animation:scan 1.5s linear infinite;top:0;}
+.scanner-icon{font-size:36px;margin:8px 0;}
+.scanner-id{font-family:var(--mono);font-size:13px;color:var(--teal);min-height:20px;}
+.scan-count{font-family:var(--head);font-size:26px;font-weight:900;color:var(--white);}
+#qrHiddenInput{position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;max-height:420px;overflow-y:auto;padding:4px;}
+.qr-card{border:1.5px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;background:#f8fafc;cursor:pointer;transition:all .2s;}
+.qr-card:hover{border-color:var(--teal);background:#eff6ff;}
+.qr-card .qr-name{font-size:11px;font-weight:600;margin-top:8px;font-family:var(--body);color:var(--white);}
+.qr-card .qr-id{font-family:var(--mono);font-size:10px;color:var(--gray);}
+.face-panel{position:relative;}
+#faceVideo{width:100%;border-radius:8px;background:#0f172a;display:block;max-height:200px;object-fit:cover;}
+#faceCanvas{position:absolute;top:0;left:0;width:100%;border-radius:8px;pointer-events:none;}
+.face-status{font-family:var(--mono);font-size:11px;color:var(--gray);margin-top:8px;min-height:16px;}
+.face-match{background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:12px;color:#15803d;margin-top:8px;display:none;animation:fadeIn .3s ease;}
+.face-match.show{display:block;}
+.zone-strip{display:flex;gap:8px;flex-wrap:wrap;}
+.zone-tag{padding:4px 12px;border-radius:4px;font-size:11px;font-family:var(--mono);display:flex;align-items:center;gap:6px;}
+.zone-tag.clear{background:#dcfce7;color:#15803d;border:1px solid #86efac;}
+.zone-tag.active{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;}
+.zone-tag.pending{background:#fef9c3;color:#854d0e;border:1px solid #fde047;}
+.search-bar{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:6px;padding:7px 14px;color:var(--white);font-family:var(--mono);font-size:12px;width:100%;outline:none;margin-bottom:12px;}
+.search-bar:focus{border-color:var(--teal);}
+.student-scroll{max-height:320px;overflow-y:auto;}
+.student-scroll::-webkit-scrollbar{width:4px;}
+.student-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
+.evac-ring{width:110px;height:110px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;position:relative;}
+.evac-ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);}
+.evac-ring .ring-text{position:relative;z-index:1;text-align:center;}
+.seismic-level{display:flex;gap:4px;margin-top:8px;}
+.level-bar{height:20px;flex:1;border-radius:3px;background:#e2e8f0;transition:background .3s;}
+.level-bar.active-low{background:var(--green);}
+.level-bar.active-med{background:var(--yellow);}
+.level-bar.active-high{background:var(--red);}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;}
+.modal.show{display:flex;}
+.modal-box{background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:28px;max-width:520px;width:95%;animation:fadeIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:90vh;overflow-y:auto;}
+.modal-box.wide{max-width:800px;}
+.modal-title{font-family:var(--head);font-size:20px;font-weight:900;margin-bottom:12px;}
+.modal-input{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:6px;padding:10px 14px;color:var(--white);font-family:var(--body);font-size:13px;width:100%;outline:none;transition:border-color .2s;margin-bottom:10px;}
+.modal-input:focus{border-color:var(--teal);}
+.modal-label{font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:4px;display:block;letter-spacing:1px;text-transform:uppercase;}
+.modal-error{font-family:var(--mono);font-size:11px;color:var(--red);margin-bottom:10px;display:none;}
+.modal-error.show{display:block;}
+.hw-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-family:var(--mono);font-size:11px;border:1px solid #e2e8f0;background:#f8fafc;}
+.hw-pill .hd{width:8px;height:8px;border-radius:50%;background:var(--gray);}
+.hw-pill .hd.on{background:var(--green);animation:pulse-green 2s infinite;}
+.hw-pill .hd.err{background:var(--red);}
+@keyframes scanFlash{0%{background:rgba(37,99,235,.15)}100%{background:transparent}}
+.scan-flash{animation:scanFlash .5s ease;}
+.login-container{position:fixed;inset:0;background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);display:flex;align-items:center;justify-content:center;z-index:300;}
+.login-container.hidden{display:none;}
+.login-box{background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:40px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:fadeIn .5s ease;}
+.login-header{text-align:center;margin-bottom:32px;}
+.login-logo{font-family:var(--head);font-weight:900;font-size:28px;letter-spacing:2px;color:var(--teal);margin-bottom:8px;}
+.login-logo span{color:var(--orange);}
+.login-subtitle{font-size:12px;color:var(--gray);font-family:var(--mono);letter-spacing:1px;}
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:600;color:var(--white);font-family:var(--head);letter-spacing:1px;text-transform:uppercase;}
+.form-input{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:6px;padding:12px 14px;font-family:var(--body);font-size:13px;color:var(--white);transition:all .3s;}
+.form-input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+.form-input::placeholder{color:var(--gray);}
+.login-error{background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:10px 12px;font-size:12px;color:#dc2626;font-family:var(--mono);display:none;margin-bottom:12px;}
+.login-error.show{display:block;}
+.login-btn{background:var(--teal);color:#fff;border:none;border-radius:6px;padding:12px;font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:1.5px;cursor:pointer;text-transform:uppercase;transition:all .2s;width:100%;}
+.login-btn:hover{background:var(--teal2);}
+.login-hint{background:#f0f7ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-top:16px;font-size:11px;color:#1d4ed8;font-family:var(--mono);line-height:1.8;text-align:center;}
+@media(max-width:900px){
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .grid-main,.grid2{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<input id="qrHiddenInput" type="text" autocomplete="off" tabindex="-1">
+
+<!-- LOGIN -->
+<div class="login-container" id="loginContainer">
+  <div class="login-box">
+    <div class="login-header">
+      <div class="login-logo">SEERS <span>|</span> </div>
+      <div class="login-subtitle">SMART EARTHQUAKE EMERGENCY RESPONSE SYSTEM</div>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-input" id="loginUsername" placeholder="Enter username" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-input" id="loginPassword" placeholder="Enter password">
+    </div>
+    <button class="login-btn" onclick="handleLogin()">Login</button>
+    <div class="login-hint">admin / seers123 &nbsp;|&nbsp; operator / orcr2026 &nbsp;|&nbsp; teacher / coadmin123</div>
+  </div>
+</div>
+
+<div class="alert-banner" id="alertBanner">⚠ EARTHQUAKE DETECTED — EMERGENCY EVACUATION PROTOCOL ACTIVATED ⚠</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">SEERS <span>|</span> ORCR</div>
+  <div class="topbar-center">
+    <span>Philsca — Pasay</span>
+    <span class="hw-pill" id="pillQR"><span class="hd" id="hdQR"></span>QR READER</span>
+    <span class="hw-pill" id="pillCam"><span class="hd" id="hdCam"></span>CAMERA</span>
+    <span class="hw-pill" id="pillFace"><span class="hd" id="hdFace"></span><span id="faceLabel">FACE: IDLE</span></span>
+    <span class="hw-pill" id="pillSeismic"><span class="hd" id="hdSeismic"></span>SEISMIC</span>
+    <span class="hw-pill" id="pillArduino"><span class="hd" id="hdArduino"></span>ARDUINO</span>
+  </div>
+  <div class="status-indicator">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText" style="font-family:var(--mono);font-size:12px">STANDBY</span>
+    &nbsp;&nbsp;<span id="clock"></span>
+    &nbsp;&nbsp;<button onclick="logout()" style="background:none;border:1px solid var(--red);color:var(--red);padding:5px 12px;border-radius:4px;font-family:var(--mono);font-size:11px;cursor:pointer;font-weight:600">LOGOUT</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="seismic-bar">
+    <div style="min-width:160px">
+      <div class="seismic-label">⚡ SEISMIC MONITOR</div>
+      <div class="mmi-label" id="mmiLabel">MMI: I — Not felt</div>
+      <div class="seismic-level" id="seismicLevel">
+        <div class="level-bar" id="lb1"></div><div class="level-bar" id="lb2"></div>
+        <div class="level-bar" id="lb3"></div><div class="level-bar" id="lb4"></div>
+        <div class="level-bar" id="lb5"></div><div class="level-bar" id="lb6"></div>
+        <div class="level-bar" id="lb7"></div><div class="level-bar" id="lb8"></div>
+      </div>
+    </div>
+
+    <div class="seismic-canvas-wrap">
+      <canvas id="seismic" height="56"></canvas>
+    </div>
+
+    <div class="seismic-readings" id="seismicReadings">
+      <div class="axis-reading">
+        <span>X-axis</span>
+        <span id="axX" style="color:#e53e3e">0.000 g</span>
+      </div>
+      <div class="axis-reading">
+        <span>Y-axis</span>
+        <span id="axY" style="color:#38a169">0.000 g</span>
+      </div>
+      <div class="axis-reading">
+        <span>Z-axis</span>
+        <span id="axZ" style="color:var(--teal)">0.000 g</span>
+      </div>
+      <div class="axis-reading" style="margin-top:4px;border-top:1px solid #e2e8f0;padding-top:4px">
+        <span>Peak</span>
+        <span id="axPeak" style="color:var(--orange)">0.000 g</span>
+      </div>
+    </div>
+
+    <div id="seismicSourceLabel" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--gray);text-align:right">
+      Source: Simulation
+    </div>
+
+    <div>
+      <div class="magnitude-display safe-mag" id="magDisplay">0.0</div>
+      <div class="mmi-label" style="text-align:right">Richter Scale</div>
+    </div>
+  </div>
+</div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn btn-danger"  id="btnEQ"    onclick="triggerEarthquake()">🌍 Simulate Earthquake</button>
+    <button class="btn btn-primary" id="btnScan"  onclick="manualQRScan()">📡 Manual QR Scan</button>
+    <button class="btn btn-success" id="btnFace"  onclick="toggleFaceRecog()">📷 Face Recognition</button>
+    <button class="btn btn-outline"  id="btnStream" onclick="toggleSkyworth()">📡 Skyworth Live</button>
+    <button class="btn btn-warning" id="btnQRGen" onclick="openQRModal()">🔲 QR Code Generator</button>
+    <button class="btn btn-outline" id="btnReset" onclick="resetSystem()">↺ Reset System</button>
+    <button class="btn btn-outline" id="btnAutoSim" onclick="toggleAutoSimulate()">⏱ Auto Simulate</button>
+    <button class="btn btn-outline" id="btnAdd"   onclick="openAddStudentModal()">+ Add Student</button>
+    <span id="phaseLabel" style="font-family:var(--mono);font-size:12px;color:var(--gray);align-self:center;margin-left:auto">PHASE: STANDBY</span>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card total">
+      <div class="label">Total Enrolled</div><div class="value" id="statTotal">0</div><div class="sub">Students registered</div>
+    </div>
+    <div class="stat-card evacuated">
+      <div class="label">Evacuated</div><div class="value" id="statEvac">0</div><div class="sub">At assembly point</div>
+    </div>
+    <div class="stat-card safe">
+      <div class="label">Accounted</div><div class="value" id="statSafe">0</div><div class="sub">ORCR verified</div>
+    </div>
+    <div class="stat-card missing">
+      <div class="label">Missing / Unaccounted</div><div class="value" id="statMissing">0</div><div class="sub">Require search &amp; rescue</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="grid-main">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Student Headcount</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--gray)" id="scanRate">Scan rate: 0/min</span>
+      </div>
+      <div class="panel-body" style="padding:12px">
+        <input class="search-bar" id="searchBar" placeholder="Search name or ID — or scan QR code here..." oninput="filterStudents()">
+        <div class="student-scroll">
+          <table class="student-table">
+            <thead><tr><th>ID</th><th>Student Name</th><th>Year / Sec</th><th>Method</th><th>Status</th><th>Time</th><th>Actions</th></tr></thead>
+            <tbody id="studentTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">QR Scanner</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--gray)">USB / WEBCAM</span>
+        </div>
+        <div class="panel-body" style="padding:12px">
+          <div class="scanner-box" id="scannerBox">
+            <div class="scan-line" id="scanLine" style="display:none"></div>
+            <div class="scanner-icon" id="scanIcon">📡</div>
+            <div class="scan-count" id="scanCount">0</div>
+            <div style="font-size:11px;color:var(--gray);font-family:var(--mono)">scans detected</div>
+            <div class="scanner-id" id="lastScanId">Waiting for scan...</div>
+          </div>
+          <div id="qrCamWrap" style="display:none;margin-top:10px;position:relative">
+            <video id="qrVideo" style="width:100%;border-radius:6px;background:#0f172a" autoplay playsinline muted></video>
+            <canvas id="qrScanCanvas" style="display:none"></canvas>
+            <div style="position:absolute;top:8px;right:8px">
+              <button class="btn btn-sm btn-danger" onclick="stopQRCamera()">✕ Stop</button>
+            </div>
+            <div id="qrCamStatus" style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:4px;text-align:center">Scanning for QR codes...</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-sm btn-primary" style="flex:1" onclick="startQRCamera()">📷 Use Camera</button>
+            <button class="btn btn-sm btn-outline" style="flex:1" onclick="focusQRInput()">⌨ USB Scanner</button>
+          </div>
+          <div style="margin-top:12px">
+            <div class="progress-item">
+              <div class="progress-label"><span>RFID/QR Coverage</span><span id="rfidPct">0%</span></div>
+              <div class="progress-track"><div class="progress-fill" id="rfidBar" style="width:0%;background:var(--teal)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-label"><span>Face Recognition</span><span id="camPct">0%</span></div>
+              <div class="progress-track"><div class="progress-fill" id="camBar" style="width:0%;background:var(--orange)"></div></div>
+            </div>
+            <div class="progress-item">
+              <div class="progress-label"><span>Overall Headcount</span><span id="overallPct">0%</span></div>
+              <div class="progress-track"><div class="progress-fill" id="overallBar" style="width:0%;background:var(--green)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Face Recognition</span>
+          <span id="faceStatusPill" style="font-family:var(--mono);font-size:10px;color:var(--gray)">OFFLINE</span>
+        </div>
+        <div class="panel-body" style="padding:12px">
+          <div class="face-panel" id="facePanel">
+            <video id="faceVideo" autoplay playsinline muted style="display:none"></video>
+            <canvas id="faceCanvas" style="display:none"></canvas>
+            <div id="facePlaceholder" style="background:#f1f5f9;border-radius:8px;padding:24px;text-align:center;border:2px dashed #cbd5e1">
+              <div style="font-size:32px;margin-bottom:8px">📷</div>
+              <div style="font-family:var(--mono);font-size:11px;color:var(--gray)">Click "Face Recognition"<br>to activate webcam</div>
+            </div>
+            <img id="mjpegImg" style="display:none;width:100%;border-radius:8px;background:#0f172a;max-height:200px;object-fit:cover" alt="Skyworth H30 Live">
+            <div id="hlsStatus" style="display:none;font-family:var(--mono);font-size:10px;color:var(--gray);margin-top:4px;text-align:center">Connecting to Skyworth H30...</div>
+            <div class="face-status" id="faceStatus">Camera offline</div>
+            <div class="face-match" id="faceMatch"></div>
+          </div>
+          <div style="margin-top:12px">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px;letter-spacing:1px">BUILDING ZONES</div>
+            <div class="zone-strip" id="zoneStrip">
+              <div class="zone-tag pending">● Zone A (Bldg 1)</div>
+              <div class="zone-tag pending">● Zone B (Bldg 2)</div>
+              <div class="zone-tag pending">● Zone C (Gym)</div>
+              <div class="zone-tag pending">● Zone D (Library)</div>
+              <div class="zone-tag pending">● Zone E (Admin)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM GRID -->
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">System Event Log</span>
+        <button onclick="clearLog()" style="background:none;border:none;color:var(--gray);cursor:pointer;font-size:11px;font-family:var(--mono)">CLEAR</button>
+      </div>
+      <div class="panel-body" style="padding:12px 16px"><div class="log-feed" id="logFeed"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Evacuation Summary</span></div>
+      <div class="panel-body">
+        <div class="evac-ring">
+          <svg viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--teal)" stroke-width="10"
+              stroke-dasharray="326.7" id="evacCircle" stroke-dashoffset="326.7" stroke-linecap="round"
+              style="transition:stroke-dashoffset 1s ease"/>
+          </svg>
+          <div class="ring-text">
+            <div style="font-size:26px;font-weight:900;color:var(--teal)" id="evacPct">0%</div>
+            <div style="font-size:10px;color:var(--gray);font-family:var(--mono)">evacuated</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div style="background:#f8fafc;border-radius:6px;padding:10px;text-align:center;border:1px solid #e2e8f0">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--gray)">RESPONSE TIME</div>
+            <div style="font-family:var(--head);font-size:20px;font-weight:900;color:var(--yellow)" id="responseTime">00:00</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:6px;padding:10px;text-align:center;border:1px solid #e2e8f0">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--gray)">SCAN SPEED</div>
+            <div style="font-family:var(--head);font-size:20px;font-weight:900;color:var(--teal)" id="scanSpeed">0s</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:6px;padding:10px;text-align:center;border:1px solid #e2e8f0">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--gray)">EARTHQUAKE MAG</div>
+            <div style="font-family:var(--head);font-size:20px;font-weight:900;color:var(--red)" id="eqMagFinal">—</div>
+          </div>
+          <div style="background:#f8fafc;border-radius:6px;padding:10px;text-align:center;border:1px solid #e2e8f0">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--gray)">ALERTS SENT</div>
+            <div style="font-family:var(--head);font-size:20px;font-weight:900;color:var(--orange)" id="alertsSent">0</div>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--gray);margin-bottom:6px">MISSING STUDENTS</div>
+          <div id="missingList" style="font-size:12px;color:var(--red);font-family:var(--mono);line-height:1.8;white-space:pre">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Earthquake Modal -->
+<div class="modal" id="eqModal">
+  <div class="modal-box">
+    <div class="modal-title" style="color:var(--red)">⚠ EARTHQUAKE DETECTED</div>
+    <div class="modal-body" id="eqModalBody" style="font-size:14px;color:var(--white);line-height:1.7;margin-bottom:20px"></div>
+    <div id="seismicSensorReadout" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;margin-bottom:16px;font-family:var(--mono);font-size:12px;display:none">
+      <div style="color:var(--gray);font-size:10px;margin-bottom:6px">SEISMIC SENSOR READINGS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div><div style="color:#e53e3e" id="mX">X: 0.00g</div></div>
+        <div><div style="color:#38a169" id="mY">Y: 0.00g</div></div>
+        <div><div style="color:var(--teal)" id="mZ">Z: 0.00g</div></div>
+      </div>
+    </div>
+    <button class="btn btn-danger" onclick="closeModal()">ACKNOWLEDGE &amp; PROCEED</button>
+  </div>
+</div>
+
+<!-- QR Generator Modal -->
+<div class="modal" id="qrModal">
+  <div class="modal-box wide">
+    <div class="modal-title" style="color:var(--teal)">🔲 Student QR Codes</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--gray);margin-bottom:12px">Click any card to print/download that student's QR code.</div>
+    <input class="modal-input" id="qrSearch" placeholder="Filter students..." oninput="filterQRCards()">
+    <div class="qr-grid" id="qrGrid"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;gap:8px">
+      <button class="btn btn-outline" onclick="closeQRModal()">Close</button>
+      <button class="btn btn-primary" onclick="printAllQR()">🖨 Print All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal" id="addStudentModal">
+  <div class="modal-box">
+    <div class="modal-title" style="color:var(--teal)">+ Add Student</div>
+    <div class="modal-error" id="addStudentError"></div>
+    <label class="modal-label">ID Number</label>
+    <input id="addStudentId" class="modal-input" placeholder="2021-XXXXX">
+    <label class="modal-label">Full Name</label>
+    <input id="addStudentName" class="modal-input" placeholder="Last, First M.">
+    <label class="modal-label">Year / Section</label>
+    <input id="addStudentYr" class="modal-input" placeholder="e.g. 3-A">
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-outline" onclick="closeAddStudentModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddStudent()">Save Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- Enroll Face Modal -->
+<div class="modal" id="enrollFaceModal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-title" style="color:var(--teal)">📷 Enroll Face — <span id="enrollWho">—</span></div>
+    <div id="enrollStartHint" style="color:var(--gray);font-size:13px;margin-bottom:10px">
+      We'll guide you through a few head poses and capture sharp shots automatically.
+      Stand <strong>1–2 meters</strong> from the camera in good light.
+    </div>
+
+    <div style="position:relative;background:#0b1220;border-radius:10px;overflow:hidden;
+                aspect-ratio:16/9;display:flex;align-items:center;justify-content:center">
+      <img id="enrollStream" alt="camera"
+           style="width:100%;height:100%;object-fit:cover;display:none">
+      <div id="enrollStreamMsg" style="color:var(--gray);font-size:13px;padding:20px;text-align:center">
+        Camera preview will appear here.
+      </div>
+      <div id="enrollFlash" style="position:absolute;inset:0;border:6px solid #16a34a;
+           border-radius:10px;opacity:0;transition:opacity .15s"></div>
+    </div>
+
+    <div id="enrollPrompt" style="font-size:18px;font-weight:700;color:#e2e8f0;
+         margin-top:12px;text-align:center;min-height:24px">Press Start to begin</div>
+    <div id="enrollStatus" style="text-align:center;color:var(--gray);
+         font-size:13px;min-height:18px;margin-top:2px">&nbsp;</div>
+
+    <div style="background:#0b1220;border-radius:8px;height:10px;margin-top:10px;overflow:hidden">
+      <div id="enrollBar" style="height:100%;width:0%;background:var(--teal);transition:width .25s"></div>
+    </div>
+    <div id="enrollCounts" style="text-align:center;color:var(--gray);
+         font-size:12px;margin-top:6px">Pose 0/0 • 0 shots saved</div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-outline" id="enrollCancelBtn" onclick="cancelEnroll()">Skip for now</button>
+      <button class="btn btn-primary" id="enrollStartBtn" onclick="startEnroll()">Start</button>
+    </div>
+  </div>
+</div>
+<script src="script.js" defer></script>
+</body>
+</html>

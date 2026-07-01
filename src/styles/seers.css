@@ -1,0 +1,70 @@
+/* SEERS — Smart Earthquake Emergency Response System
+   Design tokens, fonts and keyframes adapted from the reference SEERS.html */
+
+:root {
+  --seers-navy: #f0f4f8;
+  --seers-teal: #2563eb;
+  --seers-teal2: #1d4ed8;
+  --seers-orange: #ea6c00;
+  --seers-red: #dc2626;
+  --seers-green: #16a34a;
+  --seers-yellow: #b45309;
+  --seers-ink: #1e293b;
+  --seers-gray: #64748b;
+
+  --seers-mono: 'Share Tech Mono', monospace;
+  --seers-head: 'Exo 2', sans-serif;
+  --seers-body: 'Rajdhani', sans-serif;
+}
+
+.font-mono-seers { font-family: var(--seers-mono); }
+.font-head-seers { font-family: var(--seers-head); }
+.font-body-seers { font-family: var(--seers-body); }
+
+/* Faint grid backdrop for the dashboard shell */
+.seers-grid-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes seers-shake {
+  0%, 100% { transform: translate(0, 0) }
+  10% { transform: translate(-6px, 4px) }
+  20% { transform: translate(7px, -5px) }
+  30% { transform: translate(-8px, 6px) }
+  40% { transform: translate(9px, -4px) }
+  50% { transform: translate(-5px, 7px) }
+  60% { transform: translate(8px, -6px) }
+  70% { transform: translate(-7px, 5px) }
+  80% { transform: translate(6px, -3px) }
+  90% { transform: translate(-4px, 4px) }
+}
+@keyframes seers-pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .7) }
+  50% { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0) }
+}
+@keyframes seers-pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, .5) }
+  50% { box-shadow: 0 0 0 10px rgba(22, 163, 74, 0) }
+}
+@keyframes seers-blink { 0%, 100% { opacity: 1 } 50% { opacity: .2 } }
+@keyframes seers-scan { 0% { top: 0 } 100% { top: 100% } }
+@keyframes seers-fade-in { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+
+.seers-shaking { animation: seers-shake .8s ease-in-out 3; }
+.dot-pulse-green { animation: seers-pulse-green 2s infinite; }
+.dot-pulse-red { animation: seers-pulse-red .8s infinite; }
+.seers-blink { animation: seers-blink .6s infinite; }
+.seers-fade-in { animation: seers-fade-in .4s ease; }
+.seers-scan-line {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--seers-teal), transparent);
+  animation: seers-scan 1.5s linear infinite; top: 0;
+}
